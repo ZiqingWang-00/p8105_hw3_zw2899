@@ -10,6 +10,8 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(ggplot2)
 library(lubridate)
+library(patchwork)
+library(ggridges)
 ```
 
 # problem 1
@@ -116,16 +118,18 @@ There is no apparent trend of activity count by day.
 ```{r }
 hourly_accel_data = accel_data %>%
   group_by(week, day, hour) %>%
-  summarize(total_activity_min = sum(activity_count)) 
+  summarize(total_activity_hourly = sum(activity_count)) 
  
 hourly_accel_data
 ```
 
 ```{r}
-hourly_accel_data %>% ggplot(aes(x = hour, y = total_activity_min, 
+hourly_accel_data %>% ggplot(aes(x = hour, y = total_activity_hourly, 
                                  group = interaction(week, day), color = day)) + 
   geom_point(alpha = 0.5) +
-  geom_smooth(se = F)
+  geom_smooth(se = F) +
+  labs(title = "total activity count over hours for each day of week",
+       y = "total hourly activity count")
   #geom_line() 
 ```
 
@@ -152,6 +156,7 @@ We can see that precipitation, snowfall, and small depth has relatively small nu
 We clean the data by converting the unit of tmax and tmin from tenth of Celsius to Celsius. We also convert the unit of precipitation from tenth of mm to mm. We also separate the date variable to year, month, and day variables. We choose to not change the unit of the snowfall variable because mm is already a widely-used unit worldwide.
 ```{r}
 cleaned_ny_noaa = ny_noaa %>%
+  mutate(date_full = date) %>%
   separate(date, c("year", "month", "day"), sep = "-") %>%
   mutate(tmax = as.numeric(tmax)/10,
          tmin = as.numeric(tmin)/10,
@@ -189,17 +194,46 @@ cleaned_ny_noaa %>%
   ggplot(aes(x = year, y = mean_tmax, col = month, group = id)) +
   geom_line(alpha = 0.3) +
   facet_grid(.~ month) + 
-  theme(legend.position = "none")
+  theme(legend.position = "none") +
+  labs(title = "average maximum temperature in January vs. July for each weather station",
+       y = "average maximum temperature (Celsius)")
 ```
 
-Below is a two-panel plot showing (i) tmax vs tmin for the full dataset (note that a scatterplot may not be the best option); and (ii) make a plot showing the distribution of snowfall values greater than 0 and less than 100 separately by year.
+* Below is a two-panel plot showing (i) tmax vs tmin for the full dataset (note that a scatterplot may not be the best option); and (ii) make a plot showing the distribution of snowfall values greater than 0 and less than 100 separately by year.
+
+Alternative to a scatterplot, we plot tmin and tmax across years together and observe how one changes with the other over years. 
 
 ```{r}
+tmax_tmin_full_data = cleaned_ny_noaa %>%
+  filter(!is.na(tmin) & !is.na(tmax)) %>%
+  mutate(day_365 = yday(date_full)) %>%
+  pivot_longer(cols = tmax:tmin, names_to = "tmax_or_tmin", values_to = "temp") %>%
+  ggplot(aes(x = day_365, y = temp, color = tmax_or_tmin, group = interaction(year, tmax_or_tmin))) +
+  geom_line(alpha = 0.05) +
+  scale_color_manual(name = "", values = c("red", "blue"), labels = c("tmax", "tmin")) +
+  labs(title = "minimum and maximum temperature over year in multiple years",
+       x = "day of the year", y = "temperature (Celsius)")
+  #facet_grid(. ~ tmax_or_tmin) +
+  #theme(legend.position = "none")
+  #geom_smooth(se = F) 
 
+tmax_tmin_full_data
 ```
+We can see that in general, the maximum temperature and the minimum temperature vary together in the same direction.  
 
+Below is a plot of the distribution of snowfall values greater than 0 and less than 100 separately by year.
+```{r }
+snowfall_dist = cleaned_ny_noaa %>%
+  mutate(year = factor(year)) %>%
+  filter(snow > 0 & snow < 100) %>%
+  ggplot(aes(x = snow, y = year, fill = year)) +
+  geom_density_ridges(alpha = 0.5, scale = 2)  +
+  labs(title = "snowfall distribution (between 0 and 100mm) over years",
+       x = "snowfall (mm)", y = "year")
 
-
+snowfall_dist
+```
+From the plot above, we can see that the distributions of snowfall values greater than 0 and less than 100 are pretty similar every year. 
 
 
 
