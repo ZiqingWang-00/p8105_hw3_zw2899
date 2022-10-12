@@ -20,7 +20,7 @@ library(p8105.datasets)
 data("instacart")
 ```
 
-The dataset has `r nrow(instarcart)` observations and `r ncol(instcart)` variables. Each observation contains information on one product ordered by the user.
+The dataset has `r nrow(instacart)` observations and `r ncol(instacart)` variables. Each observation contains information on one product ordered by the user.
 
 There are `r nrow(distinct(instacart, aisle))` distinct aisles. 
 
@@ -153,8 +153,8 @@ We can see that precipitation, snowfall, and small depth has relatively small nu
 * Do some data cleaning. Create separate variables for year, month, and day. Ensure observations for temperature, precipitation, and snowfall are given in reasonable units. For snowfall, what are the most commonly observed values? Why?
 
 ```{r}
-ny_noaa %>%
-  separate(date, )
+#ny_noaa %>%
+#  separate(date, )
 ```
 
 
