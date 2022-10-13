@@ -6,12 +6,30 @@ output: github_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(ggplot2)
 library(lubridate)
 library(patchwork)
 library(ggridges)
+library(p8105.datasets)
+
+knitr::opts_chunk$set(
+	echo = TRUE,
+	warning = FALSE,
+	fig.width = 8, 
+  fig.height = 6,
+  out.width = "90%"
+)
+
+theme_set(theme_minimal() + theme(legend.position = "bottom"))
+
+options(
+  ggplot2.continuous.colour = "viridis",
+  ggplot2.continuous.fill = "viridis"
+)
+
+scale_colour_discrete = scale_colour_viridis_d
+scale_fill_discrete = scale_fill_viridis_d
 ```
 
 # problem 1
@@ -26,30 +44,18 @@ The dataset has `r nrow(instacart)` observations and `r ncol(instacart)` variabl
 
 There are `r nrow(distinct(instacart, aisle))` distinct aisles. 
 
-Below is a bar plot that shows the number of items ordered in aisles with more than 10000 items ordered, arranged by descending items ordered.
+Below is a plot that shows the number of items ordered in aisles with more than 10000 items ordered, arranged by descending items ordered (from the provided solutions).
 
 
-```{r fig.height = 30, fig.width = 15}
-instacart %>%
-  group_by(aisle) %>%
-  summarize(n_ordered_by_aisle = n()) %>%
-  filter(n_ordered_by_aisle >= 10000) %>%
-  arrange(desc(n_ordered_by_aisle)) %>%
-  mutate(order_magnitude = case_when(
-    n_ordered_by_aisle <= 15000 ~ "<=15K",
-    n_ordered_by_aisle <= 20000 & n_ordered_by_aisle > 15000 ~ "15K-20K",
-    n_ordered_by_aisle <= 30000 & n_ordered_by_aisle > 20000 ~ "20K-30K",
-    n_ordered_by_aisle <= 50000 & n_ordered_by_aisle > 30000 ~ "30K-50K",
-    TRUE ~ ">50K"
-    )) %>%
-  mutate(order_magnitude = factor(order_magnitude, levels = c(">50K", "30K-50K", "20K-30K", "15K-20K", "<=15K"))) %>%
-  ggplot(aes(x = aisle, y = n_ordered_by_aisle)) + 
-  geom_col() + 
-  facet_wrap(vars(order_magnitude), scales = "free", ncol = 1) + 
-  labs(title = "number of orders on popular aisles", y = "number of orders") +
-  theme_bw(base_size=50) +
-  theme(panel.spacing.y = unit(10, "line"),
-        axis.text.x = element_text(angle = 30, hjust=1))
+```{r }
+instacart %>% 
+  count(aisle) %>% 
+  filter(n > 10000) %>% 
+  mutate(aisle = fct_reorder(aisle, n)) %>% 
+  ggplot(aes(x = aisle, y = n)) + 
+  geom_point() + 
+  labs(title = "Number of items ordered in each aisle") +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))
 
 ```
 
@@ -89,22 +95,30 @@ First, import and tidy the accelerometer data:
 ```{r}
 accel_data = read_csv("./data/accel_data.csv") %>%
   janitor::clean_names() %>%
+  # convert the data to the longer format that is more suitable for manipulation using tidyverse
   pivot_longer(cols = "activity_1":"activity_1440", 
                names_to = "minute", 
                values_to = "activity_count") %>%
+  # create a new variable indicataing whether the day is a weekday or a weekend
   mutate(if_weekend = case_when(day %in% c("Friday", "Thursday", "Wednesday", "Tuesday", "Monday") ~ "weekday",
                                 TRUE ~ "weekend")) %>%
+  # convert the activity_xx variable to a minute variable using separate()
   separate(minute, c("m1", "minute"), sep = "_") %>%
-  select(-m1) %>%
+  select(-m1) %>% # remove the acticity prefix
+  # convert the minute variable from character to numeric
+  # create an hour variable indicating which hour of the day an observation is in
   mutate(minute = as.numeric(minute),
          hour = rep(rep(seq(1,24), each=60), 35)) %>%
-  mutate(day = factor(day, levels = c("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")),
-         day = factor(day))
+  # convert the day variable to a factor with conventional level order
+  mutate(day = factor(day, levels = c("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")))
 
 accel_data
 ```
 
+The tidied dataset contains `r nrow(accel_data)` observations and `r ncol(accel_data)` variables. The dataset contains minute-by-minute activity count of a person everyday for for `r max(accel_data$week)` weeks.  
+
 Next, aggregate across minutes to create a total activity variable for each day:
+
 ```{r}
 total_activity_summary = accel_data %>%
   group_by(week, day) %>%
@@ -113,9 +127,22 @@ total_activity_summary = accel_data %>%
 total_activity_summary
 ```
 
-There is no apparent trend of activity count by day. 
+From the summary table above, I don't see any apparent trend of activity count by day. We make some plots to verify this:
+
+```{r}
+total_activity_summary %>%
+  ggplot(aes(x = week, y = total_activity, color = day, group = day)) +
+  geom_point() +
+  geom_line() + 
+  labs(y = "total activity count by days in week", 
+       title = "total activity count vs. week by days in week")
+```
+I don't see any apparent trend either from the plot above. 
+
+Next, I aggregate the data by hour to make a single-panel plot that shows the 24-hour activity time courses for each day and use color to indicate day of the week.
 
 ```{r }
+# prepare a dataframe for plotting
 hourly_accel_data = accel_data %>%
   group_by(week, day, hour) %>%
   summarize(total_activity_hourly = sum(activity_count)) 
@@ -127,12 +154,13 @@ hourly_accel_data
 hourly_accel_data %>% ggplot(aes(x = hour, y = total_activity_hourly, 
                                  group = interaction(week, day), color = day)) + 
   geom_point(alpha = 0.5) +
-  geom_smooth(se = F) +
+  xlim(1,24) +
+  geom_smooth(se = F, size = 0.8, alpha = 0.8) +
   labs(title = "total activity count over hours for each day of week",
-       y = "total hourly activity count")
-  #geom_line() 
+       y = "total hourly activity count") +
+  scale_x_continuous(breaks = seq(1, 24, by = 1))
 ```
-
+I overlayed lines fitted by geom_smooth() over the data points for more informative and aesthetic visualization than line plots. The plot shows that overall, the person's activity level increases from midnight to about 10am everyday. The activity mostly peaks aroound 7pm/8pm.   
 
 # problem 3
 
@@ -174,15 +202,14 @@ cleaned_ny_noaa = cleaned_ny_noaa %>%
 cleaned_ny_noaa
 ```
 
-
 The most commonly observed values in snowfall is calculated as follows:
 ```{r}
 cleaned_ny_noaa %>%
   group_by(snow) %>%
-  summarize(snowfall_mm = n()) %>%
-  arrange(desc(snowfall_mm))
+  summarize(snowfall_mm_count = n()) %>%
+  arrange(desc(snowfall_mm_count))
 ```
-We can see from above that the most common values for snowfall is 0. This is probably because for most of the places in New York, it doesn't snow most time of the year.
+We can see from above that the most common values for snowfall is 0. This is probably because for most of the places in New York, it doesn't snow most time in the year.
 
 Below is a plot showing the average maximum temperature in January and July in each weather station across years:
 ```{r}
@@ -198,21 +225,31 @@ cleaned_ny_noaa %>%
   labs(title = "average maximum temperature in January vs. July for each weather station",
        y = "average maximum temperature (Celsius)")
 ```
+Based on the above 2-panel plot, it seems like the average maximum temperature in January and July in stations across years vary together in the same direction, i.e., higher maximum temperature in January corresponds to higher maximum temperature in July as well.  
 
-* Below is a two-panel plot showing (i) tmax vs tmin for the full dataset (note that a scatterplot may not be the best option); and (ii) make a plot showing the distribution of snowfall values greater than 0 and less than 100 separately by year.
+One outlier is that, around 1987, the average maximum temperature in July of one station (~15 Celsius) was much lower than that for other stations (~30 Celsius).   
 
-Alternative to a scatterplot, we plot tmin and tmax across years together and observe how one changes with the other over years. 
+Another outlier us that, around 1982, the average maximum temperature in January of one station (< -10 Celsius) was much lower than that for other stations (mostly between 0 Celsius and -19 Celsius).   
+
+Another outlier was that, around 2004, the average maximum temperature in January of one station (~10 Celsius) was much higher than that for other stations (mostly between 0 Celsius and -10 Celsius).    
+
+Below is a plot showing tmax vs tmin for the full dataset. Alternative to a scatterplot, we plot tmin and tmax from different years against days of the year and observe how one changes with the other:  
 
 ```{r}
 tmax_tmin_full_data = cleaned_ny_noaa %>%
   filter(!is.na(tmin) & !is.na(tmax)) %>%
+  filter(tmin < 50 & tmax < 60) %>% # filter out unreasonable temperature extremes
   mutate(day_365 = yday(date_full)) %>%
-  pivot_longer(cols = tmax:tmin, names_to = "tmax_or_tmin", values_to = "temp") %>%
-  ggplot(aes(x = day_365, y = temp, color = tmax_or_tmin, group = interaction(year, tmax_or_tmin))) +
-  geom_line(alpha = 0.05) +
-  scale_color_manual(name = "", values = c("red", "blue"), labels = c("tmax", "tmin")) +
+  pivot_longer(cols = tmax:tmin, names_to = "extrema_type", values_to = "temp") %>%
+  ggplot() +
+  geom_line(aes(x = day_365, y = temp, color = extrema_type, group = interaction(year, extrema_type)),
+            alpha = 0.05) +
+  #scale_color_manual(name = "", values = c("red", "blue"), labels = c("tmax", "tmin")) +
+  guides(colour = guide_legend(override.aes = list(alpha = 0.8)),
+         fill=guide_legend(title="extrema type")) +
   labs(title = "minimum and maximum temperature over year in multiple years",
-       x = "day of the year", y = "temperature (Celsius)")
+       x = "day of the year", y = "temperature (Celsius)") 
+  #theme(legend.position = "bottom")
   #facet_grid(. ~ tmax_or_tmin) +
   #theme(legend.position = "none")
   #geom_smooth(se = F) 
@@ -222,6 +259,7 @@ tmax_tmin_full_data
 We can see that in general, the maximum temperature and the minimum temperature vary together in the same direction.  
 
 Below is a plot of the distribution of snowfall values greater than 0 and less than 100 separately by year.
+
 ```{r }
 snowfall_dist = cleaned_ny_noaa %>%
   mutate(year = factor(year)) %>%
@@ -229,13 +267,16 @@ snowfall_dist = cleaned_ny_noaa %>%
   ggplot(aes(x = snow, y = year, fill = year)) +
   geom_density_ridges(alpha = 0.5, scale = 2)  +
   labs(title = "snowfall distribution (between 0 and 100mm) over years",
-       x = "snowfall (mm)", y = "year")
+       x = "snowfall (mm)", y = "year") 
 
 snowfall_dist
 ```
 From the plot above, we can see that the distributions of snowfall values greater than 0 and less than 100 are pretty similar every year. 
 
-
+Use the Patchwork package to make a two-panel plot from the two previous plots:
+```{r}
+tmax_tmin_full_data / snowfall_dist 
+```
 
 
 
