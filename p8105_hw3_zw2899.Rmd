@@ -47,7 +47,7 @@ There are `r nrow(distinct(instacart, aisle))` distinct aisles.
 Below is a plot that shows the number of items ordered in aisles with more than 10000 items ordered, arranged by descending items ordered (from the provided solutions).
 
 
-```{r }
+```{r ordered item count by aisle plot}
 instacart %>% 
   count(aisle) %>% 
   filter(n > 10000) %>% 
@@ -129,7 +129,7 @@ total_activity_summary
 
 From the summary table above, I don't see any apparent trend of activity count by day. We make some plots to verify this:
 
-```{r}
+```{r activity count by day line plot}
 total_activity_summary %>%
   ggplot(aes(x = week, y = total_activity, color = day, group = day)) +
   geom_point() +
@@ -150,7 +150,7 @@ hourly_accel_data = accel_data %>%
 hourly_accel_data
 ```
 
-```{r}
+```{r 24-hour activity plot}
 hourly_accel_data %>% ggplot(aes(x = hour, y = total_activity_hourly, 
                                  group = interaction(week, day), color = day)) + 
   geom_point(alpha = 0.5) +
@@ -212,7 +212,7 @@ cleaned_ny_noaa %>%
 We can see from above that the most common values for snowfall is 0. This is probably because for most of the places in New York, it doesn't snow most time in the year.
 
 Below is a plot showing the average maximum temperature in January and July in each weather station across years:
-```{r}
+```{r average tmax in Jan and July across by weather station}
 cleaned_ny_noaa %>%
   filter(month %in% c("January", "July")) %>%
   group_by(id, year, month) %>%
@@ -235,7 +235,7 @@ Another outlier was that, around 2004, the average maximum temperature in Januar
 
 Below is a plot showing tmax vs tmin for the full dataset. Alternative to a scatterplot, we plot tmin and tmax from different years against days of the year and observe how one changes with the other:  
 
-```{r}
+```{r tmax-tmin association plot}
 tmax_tmin_full_data = cleaned_ny_noaa %>%
   filter(!is.na(tmin) & !is.na(tmax)) %>%
   filter(tmin < 50 & tmax < 60) %>% # filter out unreasonable temperature extremes
@@ -260,7 +260,7 @@ We can see that in general, the maximum temperature and the minimum temperature 
 
 Below is a plot of the distribution of snowfall values greater than 0 and less than 100 separately by year.
 
-```{r }
+```{r snowfall distribution plot, fig.height = 10}
 snowfall_dist = cleaned_ny_noaa %>%
   mutate(year = factor(year)) %>%
   filter(snow > 0 & snow < 100) %>%
@@ -274,8 +274,9 @@ snowfall_dist
 From the plot above, we can see that the distributions of snowfall values greater than 0 and less than 100 are pretty similar every year. 
 
 Use the Patchwork package to make a two-panel plot from the two previous plots:
-```{r}
-tmax_tmin_full_data / snowfall_dist 
+```{r 2-panel plot, fig.height = 12}
+tmax_tmin_full_data / snowfall_dist + 
+  plot_layout(byrow = F, heights = c(1, 3)) 
 ```
 
 
